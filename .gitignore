@@ -3,7 +3,6 @@
 /apps/*/build/*
 apps/out/
 /lvgl/
-tools/dependencies/fontawesome/
 tools/dependencies/*/target/
 *__pycache__
 *.bin
