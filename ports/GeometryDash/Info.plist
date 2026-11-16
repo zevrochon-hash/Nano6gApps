@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>org.nanoapps.geometrydash</string>
+<key>CFBundleName</key><string>GeometryDash</string>
+<key>CFBundleExecutable</key><string>GeometryDash</string>
+<key>HBAppKind</key><integer>2</integer>
+<key>HBIconGlyph</key><string>cube</string>
+<key>HBIconColor</key><string>#3a7bff</string>
+</dict></plist>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>org.nanoapps.minecraft</string>
+<key>CFBundleName</key><string>Minecraft</string>
+<key>CFBundleExecutable</key><string>minecraft</string>
+<key>HBAppKind</key><integer>2</integer>
+<key>HBIconGlyph</key><string>gamepad</string>
+<key>HBIconColor</key><string>#f28b82</string>
+</dict></plist>
