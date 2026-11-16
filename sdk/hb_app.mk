@@ -249,7 +249,7 @@ ifeq ($(RELOC),1)
   CFLAGS += -mword-relocations
   RELOC_LDFLAGS := $(HB_ARCH_FLAGS) -nostdlib \
                    -Wl,--gc-sections -Wl,--build-id=none \
-                   -Wl,-q -Wl,-e,payload_entry -Wl,-Ttext,0
+                   -Wl,-q -Wl,-e,payload_entry -Wl,-T,$(SDK_DIR)/hb_reloc.ld
   APP_OUT := $(BUILD)/$(APP_NAME).hbapp
 else
   APP_OUT := $(BUILD)/$(APP_NAME).bin

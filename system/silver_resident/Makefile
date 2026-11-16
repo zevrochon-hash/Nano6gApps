@@ -29,5 +29,5 @@ endif
 # 64 MB DRAM is busy except a handful of ~1 MB free holes (largest observed:
 # 0x09350000-0x09480000). 1 MB still holds a small app pack + one app image +
 # a few icons, and keeps the resident's whole span (~1.1 MB) inside one hole.
-EXTRA_CFLAGS += -DHB_ARENA_BYTES=65536
+EXTRA_CFLAGS += -DHB_ARENA_BYTES=8192
 include ../../sdk/hb_app.mk
