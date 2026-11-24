@@ -1,6 +1,8 @@
 # NanoApps
 
-**Run homebrew apps on iPod nano 7th generation.**
+> **Important for AI contributors and maintainers:** for the current nano 6G-specific status, read [AI_HANDOFF.md](AI_HANDOFF.md) first. This repository currently builds cleanly, but the full drag-and-drop 3-folder install flow is **not yet complete on nano 6G** because the tested 6G device state does not currently have a persistent boot-time loader.
+
+**Run homebrew apps on iPod nano, with active porting work focused on the nano 6G.**
 [![NanoApps Overview](screenshots/NanoApps_Overview.png)](https://www.youtube.com/watch?v=18ioMXBhhTA)
 ▶️ **[Watch NanoApps in action on YouTube.](https://www.youtube.com/watch?v=18ioMXBhhTA)**
 

@@ -3,9 +3,9 @@
 APP_NAME := disk_bootstrap
 SRCS     := disk_bootstrap.c
 RELOC    := 1
-# The bootstrap's arena is the one the resident's whole span is allocated from,
-# so it must stay LARGER than the resident's span. The 6G resident's .bss is
-# ~77 KB (~146 KB span), so 256 KB matches the 6G budget much better than the
-# previous 7G-derived 6 MB shim.
+# The earlier 7G-derived setting here was far too large and pushed the reloc
+# image past the deferred-stage 16-bit immediate limits. On the current 6G
+# build, disk_bootstrap itself only needs a small amount of temporary space,
+# so keep this deliberately tiny unless a measured need appears.
 EXTRA_CFLAGS += -DHB_ARENA_BYTES=16384
 include ../../sdk/hb_app.mk
