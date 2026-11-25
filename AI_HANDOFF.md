@@ -77,18 +77,35 @@ A contributor supplied a "fully resolved" 6G address map. It is kept at
 `docs/n6g_addrs_external.h` (reference only, deliberately `#error`s if included
 in a build). The review is `docs/N6G_ADDRESS_MAP.md`.
 
-Headline: **do not treat it as truth.** Useful new leads (touch list layout,
-framebuffer geometry, LCD controller base) are mixed with entries that
-contradict constants verified live on hardware:
+Headline: **do not treat it as truth.** It was checked against the live 6G on
+2026-11-25 (read-only probes). Useful new leads (framebuffer geometry, LCD
+controller base, `OUR_ID_BASE` corroboration) are mixed with claims that are
+false on hardware:
 
-- it says there is no patchable home-controller vtable; this tree has verified
-  hooks at `0x086c9658` taking control in RAM
-- it says the post-touch entry is not applicable; this tree patches
-  `0x084a27f6` and polling the touch list alone missed most taps
-- its `getresource` address differs from the byte-verified one this tree
-  patches (`0x08409e86`)
+- it says there is no patchable home-controller vtable; the device has a
+  valid Itanium vtable at `0x086c9658` with ordinary Thumb slot pointers, and
+  all four stock values read back exactly
+- it says the post-touch entry is not applicable; there is a real ARM touch
+  routine at `0x084a26d6`
+- it says the touch manager is not a vtable and the OS uses encrypted
+  ObjC-style dispatch; the image contains normal C++ RTTI names
+  (`TTouchGestureMgr`, `TSilverDaisyView`, `TWheelGestureMsg`)
+- its `getresource` address (`0x08408be0`) does have the claimed prologue, but
+  its body is a 128-byte-block copy routine, not a four-argument lookup, so
+  the identity is unproven
 - its resident load address is identical to its framebuffer base, so following
   it would overwrite the framebuffer
+- its touch list `0x08800118` has no DRAM pointers and `+0x60` holds a
+  resource id, so the described node-pointer layout is wrong
+
+**Also important:** the constants this tree carried for `getresource`
+(`0x08409e86`) and post-touch (`0x084a27f6`) are unverified 7G leftovers. Both
+land mid-instruction on a live 6G, so their stock-byte guards refuse to patch.
+That is why the resource-DB and icon-poll paths are gated off on 6G. Do not
+describe them as verified.
+
+Transport gotcha worth remembering: the 6G SCSI stub only answers **512-byte**
+reads. A 256- or 128-byte request fails and looks exactly like a bad address.
 
 If you are tempted to "modernise" constants from that file, read the review
 first. Verify a prologue live before trusting any address.

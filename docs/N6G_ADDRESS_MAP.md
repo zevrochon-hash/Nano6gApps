@@ -12,14 +12,18 @@ useful and new. At least four are wrong or internally inconsistent.
 
 ## 1. Where the two maps disagree
 
-| Item | External map | This tree (verified live) | Verdict |
+| Item | External map | What the live device shows (2026-11-25) | Verdict |
 |---|---|---|---|
-| Home controller vtable | `0x00000000` — "no patchable C++ vtable on 6G" | `0x086c9658` (`HB_SILVER_HOME_VTABLE`) | **Tree wins.** Hooks at `+0x40`, `+0x184`, `+0x18c` were installed and observed taking control in RAM. |
-| Action dispatch | "N/A — app launch via SCSI channel" | slot `+0x18c`, stock `0x080a6b25` | **Tree wins.** The SCSI path is how we *inject* code, not how the OS launches home items. |
-| `getresource` entry | `0x08408be0`, prologue `0xe92d5ff0` | `0x08409e86`, prologue `0xb5f8` (`f8 b5 04 46 00 78 1d 46 0e 46`) | **Tree wins.** Our address is byte-verified and already function-patched with a stock-bytes guard. `0x08408be0` may be a different wrapper; do not swap without a live prologue check. |
-| Touch post entry | `0x00000000` — "N/A, poll `TOUCH_LIST_HEAD`" | `0x084a27f6`, prologue `0xe92d` | **Tree wins.** Polling the transient list missed roughly 3 of 4 taps. The post entry latches every event. |
-| Resident load / staging | `0x089c0000` | `0x09358000` (uncached alias `0x89358000`) | **Tree wins for SCSI staging.** `0x09358000` is the tested window. See the framebuffer conflict below for why `0x089c0000` is suspect anyway. |
-| `OUR_ID_BASE` | `0x0dad8000` | `0x0dad8000` | **Agreement.** Good corroboration. |
+| Home controller vtable | `0x00000000` — "no patchable C++ vtable on 6G" | `0x086c9658`, valid Itanium vtable (typeinfo `0x086842f0`); stock slots `+0x40`/`+0x17c`/`+0x184`/`+0x18c` read back exactly | **External map wrong.** Slots are ordinary patchable Thumb pointers. |
+| Action dispatch | "N/A — app launch via SCSI channel" | slot `+0x18c`, stock `0x080a6b25` | **External map wrong.** SCSI is the injection channel, not the OS launch path. |
+| `getresource` entry | `0x08408be0`, prologue `0xe92d5ff0` | `0x08408be0` really does start with that prologue, but its body is a two-pass 128-byte-block copy routine taking a fifth stack argument | **Prologue right, identity unproven.** Not a 4-argument lookup. |
+| Tree's old `getresource` | — | `0x08409e86` is **mid-instruction** here (`cmp r1, #0`) | **Tree constant is a 7G leftover.** The stock-bytes guard would refuse to patch, which is why that path is gated off on 6G. |
+| Touch post entry | `0x00000000` — "N/A, poll `TOUCH_LIST_HEAD`" | real ARM routine at `0x084a26d6` (`push {r4-r11,lr}`) that walks touch arrays | **External map wrong.** There is a touch routine; the old `0x084a27f6` is mid-instruction on this unit. |
+| Touch list `0x08800118` | count `+0x04`, x `+0x3c`, y `+0x48`, node ptr `+0x60` | stable for 60 s, **no DRAM pointers in 512 bytes**, `+0x60` = `0x0dad2117` (a resource id) | **Unconfirmed / likely wrong.** Cannot be a pointer-linked list head as described. |
+| Resident load / staging | `0x089c0000` | `0x089c0000` is the framebuffer base; `0x09358000` reads zeroed | **External map wrong.** Keep the tree's staging window. |
+| `OUR_ID_BASE` | `0x0dad8000` | `0x0dad8000` | **Agreement.** But it is an id base, not memory. |
+| Framebuffer | `0x089c0000`, 240x240x2 | RGB565 pixels at the base, zeros from `0x089dc200` | **Agreement.** |
+| Touch mgr `0x086855bc` | "vtable, slots are sub-vtables, not fn ptrs" | table of C++ RTTI/vtable descriptors with Thumb function pointers | **Partly wrong.** The OS is normal Itanium C++ with patchable vtables. |
 
 ---
 
@@ -114,9 +118,42 @@ peripheral range over SCSI.
   external map. Add the new value alongside it with a comment and a way to
   select it, then test.
 - `sdk/hb_silver_uitask.h` is the authority for home-controller slots.
-- `system/silver_resident/silver_resident.c` is the authority for the
-  `getresource` and post-touch patch sites, including their stock-byte guards.
+  Verified live: `0x086c9658`, slots `+0x40`/`+0x17c`/`+0x184`/`+0x18c`.
+- `system/silver_resident/silver_resident.c` contains the `getresource` and
+  post-touch patch sites, but **its addresses are 7G leftovers on 6G**:
+  `0x08409e86` and `0x084a27f6` both land mid-instruction on a live 6G. The
+  stock-byte guards therefore refuse to patch, and the features are gated off
+  (`HB_6G_HAVE_RESDB 0`, `HB_6G_HAVE_ICONPOLL 0`). Do not treat those
+  constants as verified; the real touch routine observed on hardware is at
+  `0x084a26d6`.
 - `sdk/hb_heap.c` is the authority for 6G allocation.
 - If you change a prologue or stock-byte array, the guard will refuse to patch
   and the resident will log a refusal. That is the intended failure mode, not
   a bug to route around.
+
+---
+
+## 6. Live verification run (2026-11-25)
+
+Read-only probes against an attached 6G (`05ac:1266`, 7.3 GB) produced these
+results. The shareable header that came out of this run is `n6g_addrs.h`
+(outside the repo, on the operator's Desktop); this section is the record.
+
+- Framebuffer: RGB565 pixels at `0x089c0000`, content through `0x089dbbff`,
+  zero from `0x089dc200`. Geometry/size confirmed.
+- Home vtable `0x086c9658`: valid Itanium header (typeinfo `0x086842f0`) and
+  all four stock slot values matched exactly.
+- `0x08408be0`: prologue `0xe92d5ff0` confirmed; body is a 128-byte-block,
+  two-pass copy routine with a fifth stack argument, so its identity as
+  `getresource` is not proven.
+- `0x084a26d6`: real ARM touch routine (`push {r4-r11,lr}`), reads count at
+  `+0x20` and arrays at `+0x30`/`+0x34`, writes through `+0x40`.
+- `0x08800118`: identical for 60 s (no framebuffer change either), no DRAM
+  pointers in 512 bytes, `+0x60` = `0x0dad2117`. Not a pointer list head.
+- C++ RTTI strings found in the image: `TTouchGestureMgr`, `TSilverDaisyView`,
+  `TWheelGestureMsg`, `TTextView`, `TTimerMsg` — the OS uses normal C++
+  vtables, not encrypted ObjC-style dispatch.
+- Allocator `0x08178df4` and free `0x0817d93c` are real Thumb entries.
+- Transport note: the SCSI stub only answers **512-byte** reads. Requesting
+  256 or 128 bytes fails and looks exactly like a bad address. Always read a
+  full 512 and slice.
