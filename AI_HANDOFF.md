@@ -71,12 +71,36 @@ The user-facing goal is still:
 
 That is **not currently achieved on 6G** without a persistent loader path.
 
+### 4) An external 6G address map was reviewed, and parts of it are wrong
+
+A contributor supplied a "fully resolved" 6G address map. It is kept at
+`docs/n6g_addrs_external.h` (reference only, deliberately `#error`s if included
+in a build). The review is `docs/N6G_ADDRESS_MAP.md`.
+
+Headline: **do not treat it as truth.** Useful new leads (touch list layout,
+framebuffer geometry, LCD controller base) are mixed with entries that
+contradict constants verified live on hardware:
+
+- it says there is no patchable home-controller vtable; this tree has verified
+  hooks at `0x086c9658` taking control in RAM
+- it says the post-touch entry is not applicable; this tree patches
+  `0x084a27f6` and polling the touch list alone missed most taps
+- its `getresource` address differs from the byte-verified one this tree
+  patches (`0x08409e86`)
+- its resident load address is identical to its framebuffer base, so following
+  it would overwrite the framebuffer
+
+If you are tempted to "modernise" constants from that file, read the review
+first. Verify a prologue live before trusting any address.
+
 ## Repository-specific notes
 
 ### Files worth reading first
 
 - `README.md` — general project overview, but some of it is still written from the original 7G perspective
 - `AI_HANDOFF.md` — this file; prefer this for current 6G status
+- `docs/N6G_ADDRESS_MAP.md` — review of the external 6G address map, with a conflict table
+- `docs/n6g_addrs_external.h` — the external map itself, reference only, not build input
 - `tools/build_firmware.py` — builds firmware/bootstrap assets, never flashes a device
 - `tools/build_release.py` — full release build
 - `tools/build_firmware_bootstrap.py`
@@ -125,6 +149,8 @@ Key known commits:
 - `eea5a9c` — initial public 6G port snapshot
 - `a47cbe5` — fix firmware build by shrinking bootstrap span to fit deferred-stage immediates
 - `6e2abd8` — restore vendored build dependencies and stop ignoring required Font Awesome assets
+- `eeb5efd` — add this handoff page and correct stale 6G status notes
+- the commit that adds `docs/` — external 6G address map plus the review in `docs/N6G_ADDRESS_MAP.md`
 
 ## Best next tasks
 
@@ -140,7 +166,13 @@ If you are continuing the 6G effort, the highest-value tasks are probably:
 3. **Continue 6G icon registration/home-screen integration research**
    - Hooking was observed live in RAM, but icons still did not appear in the desired persistent end-user flow.
 
-4. **Keep release/build reproducibility intact**
+4. **Verify the new touch-list lead**
+   - `0x08800118` (count `+0x04`, x `+0x3c`, y `+0x48`, first node `+0x60`,
+     pixel = fixed16 >> 4) is plausible but unverified. Confirm it with a live
+     read before building anything on it. Keep the post-touch hook for input;
+     polling alone was unreliable.
+
+5. **Keep release/build reproducibility intact**
    - Do not break fresh-clone builds while experimenting.
 
 ## Cross-platform guidance for future AI workers
