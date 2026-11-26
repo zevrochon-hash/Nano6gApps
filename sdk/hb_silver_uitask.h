@@ -65,11 +65,10 @@
  * returns 1 without translating if so; hb_silver_rawmsg mirrors that check, so
  * a message the stock handler would swallow is still swallowed.
  *
- * Kept at 0 until the stage-1 hooks are proven on-device: with it off,
- * hb_silver_translate_msg returns "", hb_silver_rawmsg never claims, and every
- * message reaches the stock handler untouched (exactly stock behaviour). Flip
- * to 1 for the tap-routing test (T5) — no other change needed. */
-#define HB_SILVER_HAVE_MSG_TRANSLATE 0
+ * 6G: translator addresses are verified from stock rawmsg 0x08171ac1
+ * (translate=0x0825a618, str_unlink=0x081892c0, dispatch_se=0x82b9d78,
+ * busy_off=0xdc). Enable so taps on our home items can be claimed and routed. */
+#define HB_SILVER_HAVE_MSG_TRANSLATE 1
 #define HB6_A_TRANSLATE    0x0825a618u
 #define HB6_A_STR_UNLINK   0x081892c0u
 #define HB6_STR_EMPTY_REP  0x08b821d4u

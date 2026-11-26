@@ -70,7 +70,13 @@
  * 0x09350000; the resident copies the pack into its arena before registering,
  * so the hole is only borrowed for the duration of the deploy. */
 #if !HB_6G_HAVE_FS
+/* The stage address is a *boot-specific* free hole, not a constant: the 6G OS
+ * heap moves between boots. Override it per deploy (Makefile PACK_STAGE=0x...)
+ * after checking the hole is zero on the live device. The default is the last
+ * observed hole and is only a fallback. */
+#ifndef HB_6G_PACK_STAGE
 #define HB_6G_PACK_STAGE     0x09490000u
+#endif
 #define HB_6G_PACK_MAX       (448u * 1024u)
 #endif
 #define HB_6G_HAVE_BATT      0   /* A_BATT_LEVEL/A_BATT_STATUS */
@@ -1229,12 +1235,17 @@ static void hb_unload_other_apps(int keep)
 }
 
 /* Launch app record `L` from the home controller `self` (UI task). */
+/* 6G direct framebuffer writes (cached 0x089c0000 and uncached 0x889c0000)
+ * crash/reboot on current 6G. Launch is confirmed via trace until the 6G
+ * screen/GFX path is ported. */
+
 __attribute__((used, noinline))
 static void hb_app_launch(void *self, const hb_app_launch_t *L)
 {
 #if !HB_6G_HAVE_SCREEN
     (void)self;
     hb_trace_log("LAUNCH  ", L ? L->app_id : 0, 0);
+    (void)self;
     return;
 #endif
     int slot = (int)(L - g_launch);
@@ -1417,8 +1428,9 @@ static int hb_refresh_apps(int returning_home)
     s_refreshing = 0;
     return 1;
 #else
+    /* 6G has no FS catalog to refresh; the staged RAM pack is static. */
     (void)returning_home;
-    return 0;
+    return 1;
 #endif
 }
 
@@ -1463,6 +1475,7 @@ static int hb_home_message_hook(void *self, void *msg)
     return ((msg_fn_t)HB_SILVER_HOME_MESSAGE_ORIG)(self, msg);
 }
 
+__attribute__((used, noinline))
 static void hb_register_apps_once(void)
 {
     if (s_apps_loaded) return;

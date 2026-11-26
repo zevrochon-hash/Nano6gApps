@@ -234,7 +234,18 @@ int hb_app_register_pack(const void *pack_v, void *(*alloc)(uint32_t size),
                 files && files[a].standalone ? files[a].folder : name);
             hb_silver_icon_set_hash((int)a, files ? files[a].icon_hash : 0,
                                    files ? files[a].standalone : 0);
+#ifdef HB_6G_SLOT_PROBE
+            /* Debug build: give each app a different descriptor slot so one
+             * boot shows which slot the resting Home grid actually draws. */
+            {
+                static const signed char probe_slots[3] = {3, 1, 2};
+                hb_silver_home_icon_slot = probe_slots[a % 3];
+            }
+#endif
             hb_silver_home_add_item(sbid, (int)hdr->label_id, (int)icon_id);
+#ifdef HB_6G_SLOT_PROBE
+            hb_silver_home_icon_slot = -1;
+#endif
         }
 #endif
 

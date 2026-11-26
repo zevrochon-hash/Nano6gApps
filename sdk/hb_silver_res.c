@@ -141,67 +141,92 @@ void hb_silver_resdb_unpublish(void *node_storage)
  *
  * HB_6G_ITEM_ICON_SLOTS selects which descriptor slots carry our icon, so a
  * single rebuild can A/B the draw path without touching this code:
- *   3 (default) = d3 only  — stock primary slot
- *   1           = d1 only  — the other 105x105 slot
+ *   1 (default) = d1 only  — the slot the resting Home grid draws
+ *                            (verified live: one app per slot, only d1 showed)
+ *   3           = d3 only  — stock "primary" slot (not drawn in the resting grid)
  *   2           = d2 only  — first 164x154 overlay slot
  *   4           = all four — guarantees the icon is in whichever slot the
  *                            renderer reads (identical bitmap, so the cell
  *                            looks the same if several are drawn)
+ *
+ * hb_silver_home_icon_slot overrides the compile-time default for the next
+ * registration (used by the HB_6G_SLOT_PROBE build to give each test app a
+ * different slot, so one boot reveals which slot the resting grid reads).
+ * -1 keeps HB_6G_ITEM_ICON_SLOTS.
  */
 #ifndef HB_6G_ITEM_ICON_SLOTS
-#define HB_6G_ITEM_ICON_SLOTS 3
+#define HB_6G_ITEM_ICON_SLOTS 1
 #endif
-__attribute__((naked, noinline))
-static void hb6_home_register_item(void *model, void *id_str, long label_id, long image_id)
-{
-    __asm__ volatile(
-        "push {r4, r5, r6, lr}\n\t"
-        /* Desc is exactly 6 words (sp+0x00 .. sp+0x17). Use 0x18, not 0x1c:
-         * AAPCS requires SP to be 8-byte aligned at the call, and 0x1c would
-         * leave it 4(mod 8) for the whole stock insert (and every call it
-         * makes). Same layout, aligned stack. */
-        "sub sp, #0x18\n\t"
-        "mov r4, r0\n\t"              /* r4 = model                       */
-        "mov r5, r1\n\t"              /* r5 = id_str                      */
-        "mov r6, r2\n\t"              /* r6 = label_id                    */
-        "movs r0, #0\n\t"
-#if HB_6G_ITEM_ICON_SLOTS == 1
-        "str r0, [sp, #0x00]\n\t"     /* d1 = image_id                    */
-        "str r3, [sp, #0x04]\n\t"
-        "str r0, [sp, #0x08]\n\t"
-        "str r0, [sp, #0x0c]\n\t"
-#elif HB_6G_ITEM_ICON_SLOTS == 2
-        "str r0, [sp, #0x00]\n\t"     /* d2 = image_id                    */
-        "str r0, [sp, #0x04]\n\t"
-        "str r3, [sp, #0x08]\n\t"
-        "str r0, [sp, #0x0c]\n\t"
-#elif HB_6G_ITEM_ICON_SLOTS == 4
-        "str r3, [sp, #0x00]\n\t"     /* d0..d3 = image_id                */
-        "str r3, [sp, #0x04]\n\t"
-        "str r3, [sp, #0x08]\n\t"
-        "str r3, [sp, #0x0c]\n\t"
-#else
-        "str r0, [sp, #0x00]\n\t"     /* d3 = image_id (stock primary)    */
-        "str r0, [sp, #0x04]\n\t"
-        "str r0, [sp, #0x08]\n\t"
-        "str r3, [sp, #0x0c]\n\t"
-#endif
-        "mvn r0, r0\n\t"              /* r0 = -1                          */
-        "str r0, [sp, #0x10]\n\t"     /* d4 = -1 (OS default)             */
-        "str r0, [sp, #0x14]\n\t"     /* d5 = -1 (OS default)             */
-        "movs r2, #0\n\t"
-        "mov r3, r6\n\t"              /* r3 = label_id (item +0x08)       */
-        "mov r0, r4\n\t"
-        "mov r1, r5\n\t"
-        "ldr r6, =0x081dcced\n\t"     /* MODEL vt+0xc8 (Thumb bit set)   */
-        "blx r6\n\t"
-        "add sp, #0x18\n\t"
+
+int hb_silver_home_icon_slot = -1;
+
+/* Desc is exactly 6 words (sp+0x00 .. sp+0x17). Use 0x18, not 0x1c:
+ * AAPCS requires SP to be 8-byte aligned at the call, and 0x1c would leave
+ * it 4(mod 8) for the whole stock insert (and every call it makes). Same
+ * layout, aligned stack. STORES fills d0..d3; d4/d5 stay -1 (OS defaults). */
+#define HB6_REG_BODY(STORES)                                                 \
+        "push {r4, r5, r6, lr}\n\t"                                          \
+        "sub sp, #0x18\n\t"                                                  \
+        "mov r4, r0\n\t"              /* r4 = model                       */  \
+        "mov r5, r1\n\t"              /* r5 = id_str                      */  \
+        "mov r6, r2\n\t"              /* r6 = label_id                    */  \
+        "movs r0, #0\n\t"                                                    \
+        STORES                                                               \
+        "mvn r0, r0\n\t"              /* r0 = -1                          */  \
+        "str r0, [sp, #0x10]\n\t"     /* d4 = -1 (OS default)             */  \
+        "str r0, [sp, #0x14]\n\t"     /* d5 = -1 (OS default)             */  \
+        "movs r2, #0\n\t"                                                    \
+        "mov r3, r6\n\t"              /* r3 = label_id (item +0x08)       */  \
+        "mov r0, r4\n\t"                                                     \
+        "mov r1, r5\n\t"                                                     \
+        "ldr r6, =0x081dcced\n\t"     /* MODEL vt+0xc8 (Thumb bit set)   */  \
+        "blx r6\n\t"                                                         \
+        "add sp, #0x18\n\t"                                                  \
         "pop {r4, r5, r6, pc}\n\t"
-    );
+
+#define HB6_REG_FN(name, STORES)                                             \
+    __attribute__((naked, noinline))                                         \
+    static void name(void *model, void *id_str, long label_id, long image_id)\
+    {                                                                        \
+        __asm__ volatile(HB6_REG_BODY(STORES));                              \
+    }
+
+HB6_REG_FN(hb6_reg_d1,
+    "str r0, [sp, #0x00]\n\t"     /* d1 = image_id                    */
+    "str r3, [sp, #0x04]\n\t"
+    "str r0, [sp, #0x08]\n\t"
+    "str r0, [sp, #0x0c]\n\t")
+HB6_REG_FN(hb6_reg_d2,
+    "str r0, [sp, #0x00]\n\t"     /* d2 = image_id                    */
+    "str r0, [sp, #0x04]\n\t"
+    "str r3, [sp, #0x08]\n\t"
+    "str r0, [sp, #0x0c]\n\t")
+HB6_REG_FN(hb6_reg_d3,
+    "str r0, [sp, #0x00]\n\t"     /* d3 = image_id (stock primary)    */
+    "str r0, [sp, #0x04]\n\t"
+    "str r0, [sp, #0x08]\n\t"
+    "str r3, [sp, #0x0c]\n\t")
+HB6_REG_FN(hb6_reg_d4,
+    "str r3, [sp, #0x00]\n\t"     /* d0..d3 = image_id                */
+    "str r3, [sp, #0x04]\n\t"
+    "str r3, [sp, #0x08]\n\t"
+    "str r3, [sp, #0x0c]\n\t")
+
+static void hb6_home_register_item(void *model, void *id_str, long label_id,
+                                   long image_id, int slot)
+{
+    switch (slot) {
+    case 1:  hb6_reg_d1(model, id_str, label_id, image_id); break;
+    case 2:  hb6_reg_d2(model, id_str, label_id, image_id); break;
+    case 4:  hb6_reg_d4(model, id_str, label_id, image_id); break;
+    default: hb6_reg_d3(model, id_str, label_id, image_id); break;
+    }
 }
 
 void hb_silver_home_add_item(const char *sbid, int label_id, int image_id)
 {
+    int slot = hb_silver_home_icon_slot < 0
+             ? HB_6G_ITEM_ICON_SLOTS : hb_silver_home_icon_slot;
     void *model = ((get_ptr_t)FN_THUMB(ADDR_SB_MODEL))();
     uint8_t  id_obj[32] = {0};
     uint32_t extra = 0;
@@ -215,7 +240,7 @@ void hb_silver_home_add_item(const char *sbid, int label_id, int image_id)
     id_str = ((str_ctor_t)FN_THUMB(ADDR_STR_CTOR))(id_obj, sbid, &extra);
     if (!id_str)
         return;
-    hb6_home_register_item(model, id_str, (long)label_id, (long)image_id);
+    hb6_home_register_item(model, id_str, (long)label_id, (long)image_id, slot);
     ((str_release_t)FN_THUMB(ADDR_STR_RELEASE))(id_str);
 
     for (i = 0; sbid[i] && i < 120; i++)

@@ -29,4 +29,20 @@ endif
 # allocator directly instead of reserving a large static arena in .bss. Keep it
 # small unless a specific resident-side need is measured and justified.
 EXTRA_CFLAGS += -DHB_ARENA_BYTES=8192
+# 6G RAM pack stage (no OS fs port yet). This is a boot-specific free hole in
+# the live OS heap; pick one by scanning the device before a push. Default is
+# the last observed hole and is only a fallback.
+PACK_STAGE ?= 0x09490000
+EXTRA_CFLAGS += -DHB_6G_PACK_STAGE=$(PACK_STAGE)u
+# 6G home-item descriptor slots that carry the app icon (sdk/hb_silver_res.c).
+# 3 = stock primary icon slot (105x105) only; 1 = the other 105x105 slot;
+# 2 = the first 164x154 overlay slot; 4 = all four (debug A/B).
+ITEM_ICON_SLOTS ?= 1
+EXTRA_CFLAGS += -DHB_6G_ITEM_ICON_SLOTS=$(ITEM_ICON_SLOTS)
+# Diagnostic: give each test app a different descriptor slot ({3,1,2} by app
+# index) so one boot reveals which slot the resting Home grid draws.
+SLOT_PROBE ?= 0
+ifeq ($(SLOT_PROBE),1)
+EXTRA_CFLAGS += -DHB_6G_SLOT_PROBE=1
+endif
 include ../../sdk/hb_app.mk

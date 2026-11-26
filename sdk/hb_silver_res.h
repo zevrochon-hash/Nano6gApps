@@ -70,6 +70,9 @@ void hb_silver_resdb_unpublish(void *node_storage);
  * fully custom item, or existing stock ids to borrow.
  */
 void hb_silver_home_add_item(const char *sbid, int label_id, int image_id);
+/* Per-registration override for the 6G icon descriptor slot (see
+ * HB_6G_ITEM_ICON_SLOTS in hb_silver_res.c). -1 = compile-time default. */
+extern int hb_silver_home_icon_slot;
 /* Stock hide-item operation; updates page positions and posts model notices. */
 void hb_silver_home_hide_item(const char *sbid);
 
