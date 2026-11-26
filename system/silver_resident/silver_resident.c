@@ -1254,9 +1254,9 @@ static void hb_app_launch(void *self, const hb_app_launch_t *L)
     {
         extern void *hb_silver_push_screen_id(void *push_cntlr, long screen_id, long layout_id);
         static const long k_stock[3][2] = {
-            {0x0dad0a6cL, 0x0dad0922L}, /* VoiceMemos Idle */
             {0x0dad0964L, 0x0dad077fL}, /* Wallpaper Grid */
             {0x0dad096aL, 0x0dad0786L}, /* WatchSettings */
+            {0x0dad0964L, 0x0dad077fL}, /* Wallpaper Grid */
         };
         void *c = 0;
         int slot = L ? (int)(L - g_launch) : -1;
@@ -1299,10 +1299,10 @@ static void hb_app_launch(void *self, const hb_app_launch_t *L)
                     volatile uint32_t *s = (volatile uint32_t *)(uintptr_t)0x08a00300u;
                     uint32_t op = (s[0] - 1u) & 3u; /* last op just executed */
                     static const long k_calc[4][2] = {
-                        {0x0dad0a6cL, 0x0dad0922L}, /* + -> VoiceMemos */
-                        {0x0dad0964L, 0x0dad077fL}, /* - -> Wallpaper Grid */
-                        {0x0dad096aL, 0x0dad0786L}, /* * -> WatchSettings */
-                        {0x0dad0a6cL, 0x0dad0922L}, /* / -> VoiceMemos */
+                        {0x0dad0964L, 0x0dad077fL}, /* + -> Wallpaper Grid */
+                        {0x0dad096aL, 0x0dad0786L}, /* - -> WatchSettings */
+                        {0x0dad0964L, 0x0dad077fL}, /* * -> Wallpaper Grid */
+                        {0x0dad096aL, 0x0dad0786L}, /* / -> WatchSettings */
                     };
                     hb_trace_log("CALCOP  ", op, s[3]);
                     hb_silver_push_screen_id(self, k_calc[op][0], k_calc[op][1]);
