@@ -19,8 +19,8 @@ extern void hb_trace_log(const char *tag, uint32_t v1, uint32_t v2);
  * SVC took the first 6G test of the gated resident down (USB vanished). The 6G
  * needs no real invalidate here: freshly pushed code has never been cached
  * anywhere, and vtable-slot patches are data writes the CPU sees through the
- * same data path it loads through. So this is a deliberate no-op on the 6G until
- * the 6G's actual cache-maintenance syscall (if any) is identified. */
+ * same data path it loads through. Full D-cache clean+invalidate crashed on 6G;
+ * keep no-op until a safe 6G-specific sequence is identified. */
 void hb_icache_invalidate(uint32_t addr, uint32_t size)
 {
     (void)addr;

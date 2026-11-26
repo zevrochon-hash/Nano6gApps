@@ -1245,12 +1245,43 @@ static void hb_app_launch(void *self, const hb_app_launch_t *L)
 #if !HB_6G_HAVE_SCREEN
     {
         extern void *hb_silver_push_screen_id(void *push_cntlr, long screen_id, long layout_id);
+        static const long k_stock[3][2] = {
+            {0x0dad0a6cL, 0x0dad0922L}, /* VoiceMemos Idle */
+            {0x0dad0964L, 0x0dad077fL}, /* Wallpaper Grid */
+            {0x0dad096aL, 0x0dad0786L}, /* WatchSettings */
+        };
         void *c = 0;
-        hb_trace_log("LAUNCH  ", L ? L->app_id : 0, 0);
+        int slot = L ? (int)(L - g_launch) : -1;
+        hb_trace_log("LAUNCH  ", L ? L->app_id : 0, (uint32_t)slot);
+        if (L && L->code_addr && L->code_len >= sizeof(uint32_t) * 6) {
+            volatile uint32_t *bc = (volatile uint32_t *)(uintptr_t)0x08a00400u;
+            bc[0] = 0xB0010001u; bc[1] = L->app_id; bc[2] = L->code_addr; bc[3] = L->code_len;
+            void *arena = 0;
+            void *entry = hb_reloc_load((const void *)(uintptr_t)L->code_addr,
+                                        hb_os_alloc, &arena);
+            bc[4] = 0xB0010002u; bc[5] = (uint32_t)(uintptr_t)entry; bc[6] = (uint32_t)(uintptr_t)arena;
+            hb_trace_log("APPRELOC", (uint32_t)(uintptr_t)entry, (uint32_t)(uintptr_t)arena);
+            if (entry) {
+                bc[7] = 0xB0010006u; /* loaded, skipping call for diagnostic */
+                if (arena) hb_os_free(arena);
+                bc[8] = 0xB0010007u;
+            }
+        }
+        /* "One-color app": draw solid RGB565 fb, then DSB. Direct fb writes
+         * previously crashed; keep this isolated to slot 0 for testing. */
+        if (slot == 0) {
+            volatile uint32_t *fb = (volatile uint32_t *)(uintptr_t)0x089c0000u;
+            uint32_t i;
+            /* Fill full screen blue (RGB565 0x001f, packed 2 px per word). */
+            for (i = 0; i < (240u * 240u / 2u); i++) fb[i] = 0x001f001fu;
+            hb_dsb();
+            hb_trace_log("COLORAPP", L ? L->app_id : 0, 0x001f);
+            return;
+        }
         if (L && L->screen_id)
             c = hb_silver_push_screen_id(self, L->screen_id, L->layout_id);
-        if (!c)
-            c = hb_silver_push_screen_id(self, 0x0dad0a6cL, 0x0dad0922L);
+        if (!c && slot >= 0)
+            c = hb_silver_push_screen_id(self, k_stock[slot % 3][0], k_stock[slot % 3][1]);
         hb_trace_log("SCRNPUSH", (uint32_t)(uintptr_t)c, L ? L->screen_id : 0);
         return;
     }
@@ -1772,6 +1803,42 @@ void payload_entry(void *image_base, uint32_t image_span, uint32_t resident_vers
     hb_boot_report(0x150u, (uint32_t)(uintptr_t)s_trace_ring);
     hb_trace_log("RESENTRY", (uint32_t)(uintptr_t)&payload_entry, seq + 1u);
     hb_trace_log("PREVRING", (uint32_t)(uintptr_t)prev, seq);
+    /* diagnostic: stepwise reloc-load test, controlled by 0x08a00480 */
+    {
+        volatile uint32_t *bc = (volatile uint32_t *)(uintptr_t)0x08a00400u;
+        volatile uint32_t *step = (volatile uint32_t *)(uintptr_t)0x88a00480u;
+        uint32_t st = *step;
+        const void *blob = (const void *)(uintptr_t)(HB_6G_PACK_STAGE + 0x2b3dcu);
+        bc[0]=0xE1000000u|st; bc[1]=(uint32_t)(uintptr_t)blob;
+        if (st >= 1) {
+            const uint8_t *p = (const uint8_t *)blob;
+            bc[2]=0xE1000001u; bc[3]=*(volatile uint32_t *)(p);
+        }
+        if (st >= 2) {
+            const uint8_t *p = (const uint8_t *)blob;
+            uint32_t magic=*(volatile uint32_t *)(p);
+            uint32_t entry=*(volatile uint32_t *)(p+4);
+            uint32_t img=*(volatile uint32_t *)(p+8);
+            uint32_t span=*(volatile uint32_t *)(p+12);
+            uint32_t rcnt=*(volatile uint32_t *)(p+16);
+            uint32_t align=*(volatile uint32_t *)(p+20);
+            bc[4]=magic; bc[5]=entry; bc[6]=img; bc[7]=span;
+            bc[8]=rcnt; bc[9]=align;
+        }
+        if (st >= 3) {
+            bc[10]=0xE1000003u;
+            void *arena = hb_os_alloc(16u + 4u);
+            bc[11]=(uint32_t)(uintptr_t)arena;
+            if (arena) hb_os_free(arena);
+            bc[12]=0xE1000004u;
+        }
+        if (st >= 4) {
+            void *arena=0;
+            bc[13]=0xE1000005u;
+            void *ent = hb_reloc_load(blob, hb_os_alloc, &arena);
+            bc[14]=0xE1000006u; bc[15]=(uint32_t)(uintptr_t)ent;
+        }
+    }
     hb_silver_rawmsg_trace = hb_trace_log;
 
     /* Our bitmap-cache entries can only be live if this image ran before in
