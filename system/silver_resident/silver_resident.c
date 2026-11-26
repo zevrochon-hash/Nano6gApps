@@ -1243,10 +1243,17 @@ __attribute__((used, noinline))
 static void hb_app_launch(void *self, const hb_app_launch_t *L)
 {
 #if !HB_6G_HAVE_SCREEN
-    (void)self;
-    hb_trace_log("LAUNCH  ", L ? L->app_id : 0, 0);
-    (void)self;
-    return;
+    {
+        extern void *hb_silver_push_screen_id(void *push_cntlr, long screen_id, long layout_id);
+        void *c = 0;
+        hb_trace_log("LAUNCH  ", L ? L->app_id : 0, 0);
+        if (L && L->screen_id)
+            c = hb_silver_push_screen_id(self, L->screen_id, L->layout_id);
+        if (!c)
+            c = hb_silver_push_screen_id(self, 0x0dad0a6cL, 0x0dad0922L);
+        hb_trace_log("SCRNPUSH", (uint32_t)(uintptr_t)c, L ? L->screen_id : 0);
+        return;
+    }
 #endif
     int slot = (int)(L - g_launch);
     int load_state = 0;
