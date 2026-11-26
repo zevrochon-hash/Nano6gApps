@@ -1278,6 +1278,22 @@ static void hb_app_launch(void *self, const hb_app_launch_t *L)
                 hb_trace_log("APPRAN  ", L->app_id, 0);
                 /* fixed arena - do not free */
                 bc[9] = 0xB0010005u;
+                /* Try SBTesting via GotoTesting action dispatch */
+                {
+                    typedef void *(*str_ctor_t)(void *out, const char *s);
+                    typedef void (*str_dtor_t)(void *s);
+                    typedef void (*action_t)(void *self, void *str, int a2);
+                    char strbuf[16];
+                    void *str;
+                    str = ((str_ctor_t)(uintptr_t)0x0817fd6du)(strbuf, "GotoTesting");
+                    if (str) {
+                        uint32_t obj = *(uint32_t *)self;
+                        uint32_t fn = *(uint32_t *)(obj + 0x180u + 0x10u);
+                        ((action_t)(uintptr_t)(fn | 1u))(self, str, 0);
+                        ((str_dtor_t)(uintptr_t)0x081892c1u)(str);
+                    }
+                }
+                return;
             }
         }
 
