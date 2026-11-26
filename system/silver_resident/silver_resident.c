@@ -1278,8 +1278,7 @@ static void hb_app_launch(void *self, const hb_app_launch_t *L)
                 hb_trace_log("APPRAN  ", L->app_id, 0);
                 /* fixed arena - do not free */
                 bc[9] = 0xB0010005u;
-                /* Try SBTesting via GotoTesting action dispatch */
-                {
+                if (L->app_id == 0x7003u) {
                     typedef void *(*str_ctor_t)(void *out, const char *s);
                     typedef void (*str_dtor_t)(void *s);
                     typedef void (*action_t)(void *self, void *str, int a2);
@@ -1292,8 +1291,23 @@ static void hb_app_launch(void *self, const hb_app_launch_t *L)
                         ((action_t)(uintptr_t)(fn | 1u))(self, str, 0);
                         ((str_dtor_t)(uintptr_t)0x081892c1u)(str);
                     }
+                    return;
                 }
-                return;
+                if (L->app_id == 0x7000u) {
+                    /* Calc demo: no 6G render path yet. Give visible feedback by
+                     * pushing a different stock screen per operation. */
+                    volatile uint32_t *s = (volatile uint32_t *)(uintptr_t)0x08a00300u;
+                    uint32_t op = (s[0] - 1u) & 3u; /* last op just executed */
+                    static const long k_calc[4][2] = {
+                        {0x0dad0a6cL, 0x0dad0922L}, /* + -> VoiceMemos */
+                        {0x0dad0964L, 0x0dad077fL}, /* - -> Wallpaper Grid */
+                        {0x0dad096aL, 0x0dad0786L}, /* * -> WatchSettings */
+                        {0x0dad0a6cL, 0x0dad0922L}, /* / -> VoiceMemos */
+                    };
+                    hb_trace_log("CALCOP  ", op, s[3]);
+                    hb_silver_push_screen_id(self, k_calc[op][0], k_calc[op][1]);
+                    return;
+                }
             }
         }
 
